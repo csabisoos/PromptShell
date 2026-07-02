@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -11,18 +12,25 @@ public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ITerminalService _terminalService;
     private readonly IOllamaService _ollamaService;
+    private readonly IOutputInterpreterService _outputInterpreterService;
     
     [ObservableProperty]
     private string _inputCommand = string.Empty;
     
     [ObservableProperty]
     private string _terminalOutput = "PromptShell Ready... Ask me anything!";
+    
+    [ObservableProperty]
+    private string _aiExplanation = string.Empty;
 
     [ObservableProperty] 
     private bool _isPendingApproval = false;
     
     [ObservableProperty]
     private string _pendingCommand = string.Empty;
+    
+    [ObservableProperty]
+    private string _currentWorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     
     private static readonly string[] DestructiveKeywords = 
     { 
@@ -35,15 +43,9 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         _terminalService = new TerminalService();
         _ollamaService = new OllamaService();
+        _outputInterpreterService = new OutputInterpreterService();
     }
-
-    /// <summary>
-    /// Processes the current terminal input command asynchronously.
-    /// If the input is empty or contains only whitespace, the method exits without execution.
-    /// Otherwise, the input is sent for translation into a terminal command, which is either marked for approval or executed directly.
-    /// In the event of errors during translation or execution, an appropriate error message is displayed.
-    /// </summary>
-    /// <returns>A task representing the asynchronous operation.</returns>
+    
     [RelayCommand]
     private async Task ExecuteTerminalCommandAsync()
     {
@@ -52,6 +54,7 @@ public partial class MainWindowViewModel : ViewModelBase
         
         string userRequest = InputCommand;
         InputCommand = string.Empty;
+        AiExplanation = string.Empty;
         
         try
         {
@@ -74,7 +77,7 @@ public partial class MainWindowViewModel : ViewModelBase
             }
             else
             {
-                await RunCommandDirectlyAsync(generatedCommand);
+                await RunAndAnalyzeCommandAsync(generatedCommand);
             }
         }
         catch (Exception ex)
@@ -82,74 +85,62 @@ public partial class MainWindowViewModel : ViewModelBase
             TerminalOutput = $"[Fatal Error] An unexpected error occurred: {ex.Message}";
         }
     }
-
-    /// <summary>
-    /// Approves and executes a pending terminal command asynchronously.
-    /// If the command is empty or only contains whitespace, the method exits without execution.
-    /// Otherwise, the pending command is processed, approval state reset, and the command executed directly.
-    /// </summary>
-    /// <returns>A task representing the asynchronous operation.</returns>
+    
     [RelayCommand]
     private async Task ApproveCommandAsync()
     {
-        if (string.IsNullOrWhiteSpace(PendingCommand))
+        if (string.IsNullOrWhiteSpace(PendingCommand)) 
             return;
 
         string cmdToRun = PendingCommand;
         ResetApprovalState();
         
-        await RunCommandDirectlyAsync(cmdToRun);
+        await RunAndAnalyzeCommandAsync(cmdToRun);
     }
-
-    /// <summary>
-    /// Cancels the execution of a pending terminal command by resetting the approval state
-    /// and updating the terminal output to inform the user of the cancellation.
-    /// </summary>
+    
     [RelayCommand]
     private void RejectCommand()
     {
         ResetApprovalState();
         TerminalOutput = "Command execution cancelled by user.";
     }
-
-    /// <summary>
-    /// Determines whether the given command requires user approval before execution.
-    /// A command requires approval if it contains destructive keywords or redirection operators
-    /// that can potentially modify the system or files.
-    /// </summary>
-    /// <param name="command">The terminal command to evaluate.</param>
-    /// <returns>Returns true if the command requires approval; otherwise, false.</returns>
+    
     private bool RequiresApproval(string command)
     {
         var tokens = command.Split(new[] { ' ', '"', '\'' }, StringSplitOptions.RemoveEmptyEntries);
         return tokens.Any(token => DestructiveKeywords.Contains(token)) || command.Contains(">") || command.Contains(">>");
     }
-
-    /// <summary>
-    /// Executes a terminal command directly without requiring prior user approval.
-    /// The command is run in the zsh shell, and the terminal output or errors are captured and displayed.
-    /// </summary>
-    /// <param name="command">The terminal command to execute.</param>
-    /// <returns>A task representing the asynchronous operation.</returns>
-    private async Task RunCommandDirectlyAsync(string command)
+    
+    private async Task RunAndAnalyzeCommandAsync(string command)
     {
-        TerminalOutput = $"[System] Running command in zsh: {command}...";
-        var result = await _terminalService.ExecuteCommandAsync(command);
+        // Átadjuk a kiválasztott CurrentWorkingDirectory-t a szerviznek
+        TerminalOutput = $"[System] Running command in zsh ({Path.GetFileName(CurrentWorkingDirectory)})...";
+        var result = await _terminalService.ExecuteCommandAsync(command, CurrentWorkingDirectory);
 
         if (result.IsSuccessful)
         {
-            TerminalOutput = $"[Executed]: {command}\n\n{result.Output}";
+            TerminalOutput = $"[Raw Output]:\n{result.Output}";
         }
         else
         {
-            TerminalOutput = $"[Executed]: {command}\n\n[ERROR (Exit Code: {result.ExitCode})]\n{result.Error}";
+            TerminalOutput = $"[Raw Error Output - Exit Code: {result.ExitCode}]:\n{result.Error}";
+        }
+
+        TerminalOutput += "\n\n[AI] Analyzing result status...";
+        string explanation = await _outputInterpreterService.InterpretResultAsync(command, result);
+        
+        AiExplanation = explanation;
+        
+        if (result.IsSuccessful)
+        {
+            TerminalOutput = $"[Success]: {command}\n\n{result.Output}";
+        }
+        else
+        {
+            TerminalOutput = $"[Failure]: {command}\n\n{result.Error}";
         }
     }
-
-    /// <summary>
-    /// Resets the approval state for the pending command by clearing the pending command value
-    /// and setting the approval requirement status to false.
-    /// </summary>
+    
     private void ResetApprovalState()
     {
         PendingCommand = string.Empty;

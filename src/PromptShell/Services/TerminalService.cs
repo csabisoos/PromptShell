@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using PromptShell.Models;
@@ -8,7 +9,7 @@ namespace PromptShell.Services;
 
 public class TerminalService : ITerminalService
 {
-    public async Task<TerminalResult> ExecuteCommandAsync(string command, CancellationToken cancellationToken = default)
+    public async Task<TerminalResult> ExecuteCommandAsync(string command, string? workingDirectory = null, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(command))
         {
@@ -23,6 +24,11 @@ public class TerminalService : ITerminalService
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+        
+        if (!string.IsNullOrWhiteSpace(workingDirectory) && Directory.Exists(workingDirectory))
+        {
+            startInfo.WorkingDirectory = workingDirectory;
+        }
         
         startInfo.ArgumentList.Add("-c");
         startInfo.ArgumentList.Add(command);

@@ -3,24 +3,50 @@
         xmlns:vm="using:PromptShell.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
+        mc:Ignorable="d" d:DesignWidth="950" d:DesignHeight="600"
         x:Class="PromptShell.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="PromptShell"
         Background="#1E1E1E">
 
-    <Grid RowDefinitions="*, Auto, Auto" Margin="15">
+    <Grid RowDefinitions="Auto, *, Auto, Auto" Margin="15">
         
-        <ScrollViewer Grid.Row="0" Margin="0,0,0,15" VerticalScrollBarVisibility="Auto">
-            <TextBlock Text="{Binding TerminalOutput}" 
-                       Foreground="#A9B7C6" 
-                       FontFamily="Courier New, Consolas, monospace" 
-                       FontSize="13"
-                       TextWrapping="Wrap"/>
-        </ScrollViewer>
+        <Border Grid.Row="0" Background="#2D2D2D" CornerRadius="4" Padding="10" Margin="0,0,0,15">
+            <Grid ColumnDefinitions="Auto, *, Auto">
+                <TextBlock Grid.Column="0" Text="Active Directory:" Foreground="#858585" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,10,0"/>
+                <TextBlock Grid.Column="1" Text="{Binding CurrentWorkingDirectory}" Foreground="#4B6EAF" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="Courier New, monospace"/>
+                <Button Grid.Column="2" Name="BrowseFolderButton" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#3E3E42" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+            </Grid>
+        </Border>
+        
+        <Grid Grid.Row="1" ColumnDefinitions="*, 1.2*" Margin="0,0,0,15">
+            
+            <Border Grid.Column="0" Background="#121212" CornerRadius="4" Padding="10" Margin="0,0,10,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <TextBlock Text="{Binding TerminalOutput}" 
+                               Foreground="#00FF00" 
+                               FontFamily="Courier New, Consolas, monospace" 
+                               FontSize="12"
+                               TextWrapping="Wrap"/>
+                </ScrollViewer>
+            </Border>
 
-        <Border Grid.Row="1" 
+            <Border Grid.Column="1" Background="#252526" BorderBrush="#333337" BorderThickness="1" CornerRadius="4" Padding="15">
+                <Grid RowDefinitions="Auto, *">
+                    <TextBlock Grid.Row="0" Text="✨ AI Smart Interpretation" Foreground="#4B6EAF" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                        <TextBlock Text="{Binding AiExplanation}" 
+                                   Foreground="White" 
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   FontFamily="Inter, System-UI, sans-serif"/>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border Grid.Row="2" 
                 Background="#332B00" 
                 BorderBrush="#8A7300" 
                 BorderThickness="1" 
@@ -30,30 +56,18 @@
                 IsVisible="{Binding IsPendingApproval}">
             <Grid ColumnDefinitions="*, Auto, Auto">
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="Do you want to execute this command?" Foreground="#FFD700" FontWeight="Bold"/>
+                    <TextBlock Text="Do you want to execute this modification command?" Foreground="#FFD700" FontWeight="Bold"/>
                     <TextBlock Text="{Binding PendingCommand}" Foreground="White" FontFamily="Courier New, monospace" Margin="0,5,0,0"/>
                 </StackPanel>
-                <Button Grid.Column="1" 
-                        Content="Yes, Execute" 
-                        Command="{Binding ApproveCommandCommand}" 
-                        Background="#28A745" 
-                        Foreground="White" 
-                        Margin="10,0,0,0" 
-                        Padding="15,8"/>
-                <Button Grid.Column="2" 
-                        Content="No, Cancel" 
-                        Command="{Binding RejectCommandCommand}" 
-                        Background="#DC3545" 
-                        Foreground="White" 
-                        Margin="10,0,0,0" 
-                        Padding="15,8"/>
+                <Button Grid.Column="1" Content="Yes, Execute" Command="{Binding ApproveCommandCommand}" Background="#28A745" Foreground="White" Margin="10,0,0,0" Padding="15,8"/>
+                <Button Grid.Column="2" Content="No, Cancel" Command="{Binding RejectCommandCommand}" Background="#DC3545" Foreground="White" Margin="10,0,0,0" Padding="15,8"/>
             </Grid>
         </Border>
 
-        <Grid Grid.Row="2" ColumnDefinitions="*, Auto" IsEnabled="{Binding !IsPendingApproval}">
+        <Grid Grid.Row="3" ColumnDefinitions="*, Auto" IsEnabled="{Binding !IsPendingApproval}">
             <TextBox Grid.Column="0" 
                      Text="{Binding InputCommand, Mode=TwoWay}" 
-                     Watermark="Ask me to do something (e.g. 'show files' or 'create a test folder')..."
+                     PlaceholderText="Ask AI to do something in this directory (e.g. 'list text files' or 'create test folder')..."
                      Background="#2B2B2B"
                      Foreground="White"
                      BorderBrush="#3C3F41"
@@ -64,7 +78,7 @@
             </TextBox>
             
             <Button Grid.Column="1" 
-                    Content="Run" 
+                    Content="Execute" 
                     Command="{Binding ExecuteTerminalCommandCommand}"
                     Margin="10,0,0,0"
                     Padding="15,0"
