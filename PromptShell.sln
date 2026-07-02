@@ -1,10 +1,5 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "doc", "doc", "{28238F80-8C86-4449-B844-227E41857EDB}"
-	ProjectSection(SolutionItems) = preProject
-		doc\Plan.md = doc\Plan.md
-	EndProjectSection
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{36733CD3-27F0-4311-8222-5F5866D4CEB4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{1EFCCC7F-C4B5-47C6-8A4C-CF667FF0F2E0}"
