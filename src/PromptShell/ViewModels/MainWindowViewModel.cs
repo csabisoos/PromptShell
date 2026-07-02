@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -16,8 +17,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IOutputInterpreterService _outputInterpreterService;
     
     private readonly List<string> _history = new();
-    private string _lastAiQuestion = string.Empty;
     private int _historyIndex = -1;
+    private string _lastAiQuestion = string.Empty;
+    
+    private static readonly string CommandsLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "history_commands.log");
+    private static readonly string SessionLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "latest_session.log");
     
     public Func<string, Task>? CopyToClipboardAction { get; set; }
     
@@ -100,9 +104,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 _lastAiQuestion = aiResponse.TrimStart('?');
                 AiExplanation = aiResponse.TrimStart('?');
                 TerminalOutput = "PromptShell: The AI needs more information to proceed. See the Smart Interpretation panel.";
+                LogLatestSession(directoryContext, userRequest, "N/A (Clarification requested)", _lastAiQuestion);
                 return;
             }
             
+            string activeQuestionContext = _lastAiQuestion;
             _lastAiQuestion = string.Empty;
             
             if (RequiresApproval(aiResponse))
@@ -110,10 +116,11 @@ public partial class MainWindowViewModel : ViewModelBase
                 PendingCommand = aiResponse;
                 IsPendingApproval = true;
                 TerminalOutput = $"[AI] Generated command: {aiResponse}\n\n⚠️ WARNING: Modification detected. Approval required!";
+                LogLatestSession(directoryContext, userRequest, aiResponse, "Pending user approval...");
             }
             else
             {
-                await RunAndAnalyzeCommandAsync(aiResponse);
+                await RunAndAnalyzeCommandAsync(aiResponse, directoryContext, userRequest, activeQuestionContext);
             }
         }
         catch (Exception ex)
@@ -170,12 +177,13 @@ public partial class MainWindowViewModel : ViewModelBase
         string cmdToRun = PendingCommand;
         ResetApprovalState();
         
-        await RunAndAnalyzeCommandAsync(cmdToRun);
+        await RunAndAnalyzeCommandAsync(cmdToRun, "Cached on approval", "Approved command execution", "");
     }
     
     [RelayCommand]
     private void RejectCommand()
     {
+        AppendToCommandLog($"REJECTED: {PendingCommand}", -1, false);
         ResetApprovalState();
         TerminalOutput = "Command execution cancelled by user.";
     }
@@ -186,11 +194,11 @@ public partial class MainWindowViewModel : ViewModelBase
         return tokens.Any(token => DestructiveKeywords.Contains(token)) || command.Contains(">") || command.Contains(">>");
     }
     
-    private async Task RunAndAnalyzeCommandAsync(string command)
+    private async Task RunAndAnalyzeCommandAsync(string command, string directoryContext, string userRequest, string activeQuestionContext)
     {
-        TerminalOutput = $"[System] Running command in zsh ({Path.GetFileName(CurrentWorkingDirectory)})...";
+        TerminalOutput = $"[System] Running: {command}...";
         var result = await _terminalService.ExecuteCommandAsync(command, CurrentWorkingDirectory);
-
+        
         if (result.IsSuccessful)
         {
             TerminalOutput = $"[Raw Output]:\n{result.Output}";
@@ -213,6 +221,54 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             TerminalOutput = $"[Failure]: {command}\n\n{result.Error}";
         }
+        
+        AppendToCommandLog(command, result.ExitCode, result.IsSuccessful);
+        LogLatestSession(directoryContext, userRequest, command, explanation, result.Output, result.Error, result.ExitCode);
+    }
+    
+    private void AppendToCommandLog(string command, int exitCode, bool isSuccess)
+    {
+        try
+        {
+            string logLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Status: {(isSuccess ? "SUCCESS" : "FAILED")} | Exit Code: {exitCode} | Command: {command}{Environment.NewLine}";
+            File.AppendAllText(CommandsLogPath, logLine, Encoding.UTF8);
+        }
+        catch { /* Fail-silent to prevent UI crashes if file is locked */ }
+    }
+    
+    private void LogLatestSession(string context, string userRequest, string generatedCommand, string aiExplanation, string stdout = "", string stderr = "", int? exitCode = null)
+    {
+        try
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("===============================================================================");
+            sb.AppendLine($"PROMPTSHELL SESSION LOG - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine("===============================================================================");
+            sb.AppendLine($"Working Directory: {CurrentWorkingDirectory}");
+            sb.AppendLine($"Directory Context: {context}");
+            sb.AppendLine($"User Request:      {userRequest}");
+            sb.AppendLine($"Generated Command: {generatedCommand}");
+            if (exitCode.HasValue) sb.AppendLine($"Execution Status:  Exit Code {exitCode.Value}");
+            sb.AppendLine("-------------------------------------------------------------------------------");
+            sb.AppendLine("AI SMART INTERPRETATION:");
+            sb.AppendLine(aiExplanation);
+            if (!string.IsNullOrWhiteSpace(stdout))
+            {
+                sb.AppendLine("-------------------------------------------------------------------------------");
+                sb.AppendLine("STANDARD OUTPUT:");
+                sb.AppendLine(stdout);
+            }
+            if (!string.IsNullOrWhiteSpace(stderr))
+            {
+                sb.AppendLine("-------------------------------------------------------------------------------");
+                sb.AppendLine("STANDARD ERROR:");
+                sb.AppendLine(stderr);
+            }
+            sb.AppendLine("===============================================================================");
+
+            File.WriteAllText(SessionLogPath, sb.ToString(), Encoding.UTF8);
+        }
+        catch { /* Fail-silent */ }
     }
     
     private void ResetApprovalState()
