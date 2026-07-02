@@ -16,6 +16,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IOutputInterpreterService _outputInterpreterService;
     
     private readonly List<string> _history = new();
+    private string _lastAiQuestion = string.Empty;
     private int _historyIndex = -1;
     
     public Func<string, Task>? CopyToClipboardAction { get; set; }
@@ -59,7 +60,6 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         
         string userRequest = InputCommand;
-        
         _history.Add(userRequest);
         _historyIndex = _history.Count;
         
@@ -68,31 +68,57 @@ public partial class MainWindowViewModel : ViewModelBase
         
         try
         {
-            TerminalOutput = $"[AI] Interpreting request: \"{userRequest}\"...";
-            string generatedCommand = await _ollamaService.GenerateCommandAsync(userRequest);
-
-            if (string.IsNullOrWhiteSpace(generatedCommand) || generatedCommand.StartsWith("# Error"))
+            TerminalOutput = $"[AI] Analyzing directory context and request...";
+            
+            string directoryContext = "Empty folder";
+            if (Directory.Exists(CurrentWorkingDirectory))
             {
-                TerminalOutput = generatedCommand.StartsWith("# Error") 
-                    ? generatedCommand 
-                    : "[AI Error] Could not translate this request into a valid terminal command.";
+                var files = Directory.GetFiles(CurrentWorkingDirectory).Select(Path.GetFileName);
+                var dirs = Directory.GetDirectories(CurrentWorkingDirectory).Select(Path.GetFileName);
+                directoryContext = string.Join(", ", dirs.Concat(files));
+            }
+            
+            string finalPromptToSend = userRequest;
+            if (!string.IsNullOrWhiteSpace(_lastAiQuestion))
+            {
+                finalPromptToSend = $"Context of ongoing conversation:\n" +
+                                    $"AI previously asked: '{_lastAiQuestion}'\n" +
+                                    $"User replied: '{userRequest}'\n\n" +
+                                    $"Based on this reply, convert the original intent into the final command.";
+            }
+            
+            string aiResponse = await _ollamaService.GenerateCommandAsync(finalPromptToSend, directoryContext);
+
+            if (string.IsNullOrWhiteSpace(aiResponse) || aiResponse.StartsWith("# Error"))
+            {
+                TerminalOutput = aiResponse.StartsWith("# Error") ? aiResponse : "[AI Error] Invalid request.";
                 return;
             }
             
-            if (RequiresApproval(generatedCommand))
+            if (aiResponse.StartsWith("?"))
             {
-                PendingCommand = generatedCommand;
+                _lastAiQuestion = aiResponse.TrimStart('?');
+                AiExplanation = aiResponse.TrimStart('?');
+                TerminalOutput = "PromptShell: The AI needs more information to proceed. See the Smart Interpretation panel.";
+                return;
+            }
+            
+            _lastAiQuestion = string.Empty;
+            
+            if (RequiresApproval(aiResponse))
+            {
+                PendingCommand = aiResponse;
                 IsPendingApproval = true;
-                TerminalOutput = $"[AI] Generated command: {generatedCommand}\n\n⚠️ WARNING: This command can modify your system or files. Approval required!";
+                TerminalOutput = $"[AI] Generated command: {aiResponse}\n\n⚠️ WARNING: Modification detected. Approval required!";
             }
             else
             {
-                await RunAndAnalyzeCommandAsync(generatedCommand);
+                await RunAndAnalyzeCommandAsync(aiResponse);
             }
         }
         catch (Exception ex)
         {
-            TerminalOutput = $"[Fatal Error] An unexpected error occurred: {ex.Message}";
+            TerminalOutput = $"[Fatal Error]: {ex.Message}";
         }
     }
     
