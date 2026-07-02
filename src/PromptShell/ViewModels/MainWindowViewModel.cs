@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -13,6 +14,11 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly ITerminalService _terminalService;
     private readonly IOllamaService _ollamaService;
     private readonly IOutputInterpreterService _outputInterpreterService;
+    
+    private readonly List<string> _history = new();
+    private int _historyIndex = -1;
+    
+    public Func<string, Task>? CopyToClipboardAction { get; set; }
     
     [ObservableProperty]
     private string _inputCommand = string.Empty;
@@ -53,6 +59,10 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         
         string userRequest = InputCommand;
+        
+        _history.Add(userRequest);
+        _historyIndex = _history.Count;
+        
         InputCommand = string.Empty;
         AiExplanation = string.Empty;
         
@@ -87,6 +97,45 @@ public partial class MainWindowViewModel : ViewModelBase
     }
     
     [RelayCommand]
+    public void NavigateHistoryUp()
+    {
+        if (_history.Count == 0 || _historyIndex <= 0) return;
+        _historyIndex--;
+        InputCommand = _history[_historyIndex];
+    }
+    
+    [RelayCommand]
+    public void NavigateHistoryDown()
+    {
+        if (_historyIndex < _history.Count - 1)
+        {
+            _historyIndex++;
+            InputCommand = _history[_historyIndex];
+        }
+        else
+        {
+            _historyIndex = _history.Count;
+            InputCommand = string.Empty;
+        }
+    }
+    
+    [RelayCommand]
+    private async Task CopyExplanationToClipboardAsync()
+    {
+        if (CopyToClipboardAction != null && !string.IsNullOrWhiteSpace(AiExplanation))
+        {
+            await CopyToClipboardAction(AiExplanation);
+        }
+    }
+    
+    [RelayCommand]
+    private void ClearConsole()
+    {
+        TerminalOutput = "Console cleared. PromptShell Ready.";
+        AiExplanation = string.Empty;
+    }
+    
+    [RelayCommand]
     private async Task ApproveCommandAsync()
     {
         if (string.IsNullOrWhiteSpace(PendingCommand)) 
@@ -113,7 +162,6 @@ public partial class MainWindowViewModel : ViewModelBase
     
     private async Task RunAndAnalyzeCommandAsync(string command)
     {
-        // Átadjuk a kiválasztott CurrentWorkingDirectory-t a szerviznek
         TerminalOutput = $"[System] Running command in zsh ({Path.GetFileName(CurrentWorkingDirectory)})...";
         var result = await _terminalService.ExecuteCommandAsync(command, CurrentWorkingDirectory);
 

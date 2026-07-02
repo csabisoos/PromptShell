@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using PromptShell.ViewModels;
@@ -10,11 +11,22 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        
+        DataContextChanged += (sender, args) =>
+        {
+            if (DataContext is MainWindowViewModel viewModel)
+            {
+                viewModel.CopyToClipboardAction = async (text) =>
+                {
+                    if (Clipboard != null)
+                    {
+                        await Clipboard.SetTextAsync(text);
+                    }
+                };
+            }
+        };
     }
 
-    /// <summary>
-    /// Event handler for the folder browser button click event.
-    /// </summary>
     private async void BrowseFolderButton_OnClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is MainWindowViewModel viewModel)

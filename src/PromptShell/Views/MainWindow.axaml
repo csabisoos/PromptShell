@@ -16,7 +16,7 @@
             <Grid ColumnDefinitions="Auto, *, Auto">
                 <TextBlock Grid.Column="0" Text="Active Directory:" Foreground="#858585" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,10,0"/>
                 <TextBlock Grid.Column="1" Text="{Binding CurrentWorkingDirectory}" Foreground="#4B6EAF" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="Courier New, monospace"/>
-                <Button Grid.Column="2" Name="BrowseFolderButton" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#3E3E42" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+                <Button Grid.Column="2" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#3E3E42" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
             </Grid>
         </Border>
         
@@ -24,36 +24,26 @@
             
             <Border Grid.Column="0" Background="#121212" CornerRadius="4" Padding="10" Margin="0,0,10,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <TextBlock Text="{Binding TerminalOutput}" 
-                               Foreground="#00FF00" 
-                               FontFamily="Courier New, Consolas, monospace" 
-                               FontSize="12"
-                               TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding TerminalOutput}" Foreground="#00FF00" FontFamily="Courier New, Consolas, monospace" FontSize="12" TextWrapping="Wrap"/>
                 </ScrollViewer>
             </Border>
-
+            
             <Border Grid.Column="1" Background="#252526" BorderBrush="#333337" BorderThickness="1" CornerRadius="4" Padding="15">
                 <Grid RowDefinitions="Auto, *">
-                    <TextBlock Grid.Row="0" Text="✨ AI Smart Interpretation" Foreground="#4B6EAF" FontWeight="Bold" Margin="0,0,0,10"/>
+                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,10">
+                        <TextBlock Grid.Column="0" Text="✨ AI Smart Interpretation" Foreground="#4B6EAF" FontWeight="Bold" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Content="Copy" Command="{Binding CopyExplanationToClipboardCommand}" Background="#2D2D30" Foreground="White" FontSize="11" Padding="8,4" Margin="5,0"/>
+                        <Button Grid.Column="2" Content="Clear" Command="{Binding ClearConsoleCommand}" Background="#2D2D30" Foreground="White" FontSize="11" Padding="8,4"/>
+                    </Grid>
+                    
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <TextBlock Text="{Binding AiExplanation}" 
-                                   Foreground="White" 
-                                   FontSize="13"
-                                   TextWrapping="Wrap"
-                                   FontFamily="Inter, System-UI, sans-serif"/>
+                        <TextBlock Text="{Binding AiExplanation}" Foreground="White" FontSize="13" TextWrapping="Wrap" FontFamily="Inter, System-UI, sans-serif"/>
                     </ScrollViewer>
                 </Grid>
             </Border>
         </Grid>
-
-        <Border Grid.Row="2" 
-                Background="#332B00" 
-                BorderBrush="#8A7300" 
-                BorderThickness="1" 
-                CornerRadius="4" 
-                Padding="15,10" 
-                Margin="0,0,0,15"
-                IsVisible="{Binding IsPendingApproval}">
+        
+        <Border Grid.Row="2" Background="#332B00" BorderBrush="#8A7300" BorderThickness="1" CornerRadius="4" Padding="15,10" Margin="0,0,0,15" IsVisible="{Binding IsPendingApproval}">
             <Grid ColumnDefinitions="*, Auto, Auto">
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                     <TextBlock Text="Do you want to execute this modification command?" Foreground="#FFD700" FontWeight="Bold"/>
@@ -63,29 +53,19 @@
                 <Button Grid.Column="2" Content="No, Cancel" Command="{Binding RejectCommandCommand}" Background="#DC3545" Foreground="White" Margin="10,0,0,0" Padding="15,8"/>
             </Grid>
         </Border>
-
+        
         <Grid Grid.Row="3" ColumnDefinitions="*, Auto" IsEnabled="{Binding !IsPendingApproval}">
             <TextBox Grid.Column="0" 
                      Text="{Binding InputCommand, Mode=TwoWay}" 
-                     PlaceholderText="Ask AI to do something in this directory (e.g. 'list text files' or 'create test folder')..."
-                     Background="#2B2B2B"
-                     Foreground="White"
-                     BorderBrush="#3C3F41"
-                     VerticalContentAlignment="Center">
+                     Watermark="Ask AI to do something in this directory (e.g., 'show size of docs folder')..."
+                     Background="#2B2B2B" Foreground="White" BorderBrush="#3C3F41" VerticalContentAlignment="Center">
                 <TextBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding ExecuteTerminalCommandCommand}"/>
+                    <KeyBinding Gesture="Up" Command="{Binding NavigateHistoryUpCommand}"/>
+                    <KeyBinding Gesture="Down" Command="{Binding NavigateHistoryDownCommand}"/>
                 </TextBox.KeyBindings>
             </TextBox>
-            
-            <Button Grid.Column="1" 
-                    Content="Execute" 
-                    Command="{Binding ExecuteTerminalCommandCommand}"
-                    Margin="10,0,0,0"
-                    Padding="15,0"
-                    Background="#4B6EAF"
-                    Foreground="White"
-                    VerticalAlignment="Stretch"
-                    VerticalContentAlignment="Center"/>
+            <Button Grid.Column="1" Content="Execute" Command="{Binding ExecuteTerminalCommandCommand}" Margin="10,0,0,0" Padding="15,0" Background="#4B6EAF" Foreground="White" VerticalAlignment="Stretch" VerticalContentAlignment="Center"/>
         </Grid>
     </Grid>
 </Window>

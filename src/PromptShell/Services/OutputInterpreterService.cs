@@ -22,11 +22,13 @@ public class OutputInterpreterService : IOutputInterpreterService
     {
         if (result == null) return string.Empty;
         
-        string systemPrompt = "You are an expert IT system administrator and developer assistant. " +
-                              "Your task is to analyze the provided macOS terminal command execution result and explain it to the user in a friendly, clear, human-readable way. " +
-                              "If the command was successful, provide a brief summary of what happened. " +
-                              "If the command failed (ExitCode != 0 or non-empty error), explain what went wrong and suggest a clear, exact fix. " +
-                              "Keep your explanation concise and well-structured.";
+        string systemPrompt = "You are an elite, ultra-concise CLI output analyzer. " +
+                              "Your job is to read the terminal command and its output, then summarize it in a professional, telegraphic style. " +
+                              "CRITICAL: Be extremely brief. Maximum 1-2 short sentences. " +
+                              "Do NOT use conversational filler like 'Sure, here is...', 'Based on the output...', or 'This command shows...'. " +
+                              "If the output is just a single data point (e.g., folder size, IP address, user name), output ONLY that factual data in a clean format. " +
+                              "Example for folder size: 'Size of [folder]: 4.2 GB'. " +
+                              "If the command failed, output exactly what went wrong and give the exact command to fix it on a new line.";
         
         string rawPrompt = $"Command executed: {command}\n" +
                            $"Exit Code: {result.ExitCode}\n" +
