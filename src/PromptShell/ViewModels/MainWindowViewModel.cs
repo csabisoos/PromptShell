@@ -230,6 +230,14 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         try
         {
+            if (File.Exists(CommandsLogPath))
+            {
+                var fileInfo = new FileInfo(CommandsLogPath);
+                if (fileInfo.Length > 5 * 1024 * 1024) 
+                {
+                    File.WriteAllText(CommandsLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Log cleared automatically due to size limit (5MB).{Environment.NewLine}", Encoding.UTF8);
+                }
+            }
             string logLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Status: {(isSuccess ? "SUCCESS" : "FAILED")} | Exit Code: {exitCode} | Command: {command}{Environment.NewLine}";
             File.AppendAllText(CommandsLogPath, logLine, Encoding.UTF8);
         }
