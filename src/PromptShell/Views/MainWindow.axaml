@@ -3,18 +3,47 @@
         xmlns:vm="using:PromptShell.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
         x:Class="PromptShell.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
-        Title="PromptShell">
+        Title="PromptShell"
+        Background="#1E1E1E">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
-    </Design.DataContext>
-
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Grid RowDefinitions="*, Auto" Margin="15">
+        
+        <ScrollViewer Grid.Row="0" Margin="0,0,0,15" VerticalScrollBarVisibility="Auto">
+            <TextBlock Text="{Binding TerminalOutput}"
+                       Foreground="#A9B7C6"
+                       FontFamily="Courier New, Consolas, monospace"
+                       FontSize="13"
+                       TextWrapping="Wrap"/>
+        </ScrollViewer>
+        
+        <Grid Grid.Row="1" ColumnDefinitions="*, Auto">
+            <TextBox Grid.Column="0"
+                       Text="{Binding InputCommand, Mode=TwoWay}"
+                       Watermark="Type a raw terminal command (e.g. pwd, ls -la) and press Enter..."
+                       Background="#2B2B2B"
+                       Foreground="White"
+                       BorderBrush="#3C3F41"
+                       VerticalAlignment="Center">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding ExecuteTerminalCommandCommand}"></KeyBinding>
+                </TextBox.KeyBindings>
+                
+            </TextBox>
+            
+            <Button Grid.Column="1"
+                    Content="Run"
+                    Command="{Binding ExecuteTerminalCommandCommand}"
+                    Margin="10,0,0,0"
+                    Padding="15,0"
+                    Background="#4B6EAF"
+                    Foreground="White"
+                    VerticalAlignment="Stretch"
+                    VerticalContentAlignment="Center"/>
+        </Grid>
+    </Grid>
 
 </Window>
