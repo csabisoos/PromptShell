@@ -1,0 +1,15 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+*.suo
+*.user
+*.sln.docstates
+
+.idea/
+*.sln.DotSettings.user
+
+.DS_Store
+.AppleDouble
+.LSOverride
