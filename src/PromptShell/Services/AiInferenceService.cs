@@ -59,55 +59,32 @@ public class AiInferenceService : IAiInferenceService
 
     private async Task<string> ExecuteHttpInferenceAsync(string system, string user, AppSettings settings, CancellationToken cancellationToken)
     {
-        string targetUrl;
-        string modelName;
-        var request = new HttpRequestMessage(HttpMethod.Post, "");
-        
-        if (settings.AiProvider == "Proxy")
-        {
-            targetUrl = CentralProxyUrl;
-            modelName = "llama3-8b-8192";
-        }
-        else if (settings.AiProvider == "CustomApi")
-        {
-            targetUrl = settings.CustomApiUrl;
-            modelName = settings.CustomModelName;
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.CustomApiKey);
-        }
-        else
-        {
-            targetUrl = "http://localhost:11434/v1/chat/completions";
-            modelName = "llama3";
-        }
-
-        request.RequestUri = new Uri(targetUrl);
-
-        var requestBody = new
-        {
-            model = modelName,
-            messages = new[]
-            {
-                new { role = "system", content = system },
-                new { role = "user", content = user }
-            },
-            temperature = 0.1
-        };
-
-        request.Content = JsonContent.Create(requestBody);
-
         try
         {
-            var response = await _httpClient.SendAsync(request, cancellationToken);
+            // Use Ollama /api/generate endpoint (simpler, more reliable)
+            const string ollamaUrl = "http://localhost:11434/api/generate";
+            const string modelName = "llama3";
+            
+            var requestBody = new OllamaRequest(
+                Model: modelName,
+                Prompt: user,
+                SystemPrompt: system,
+                Stream: false
+            );
+
+            var response = await _httpClient.PostAsJsonAsync(ollamaUrl, requestBody, cancellationToken);
             response.EnsureSuccessStatusCode();
             
-            var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken), cancellationToken: cancellationToken);
-            string content = jsonDoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString();
-            
-            return content?.Trim() ?? string.Empty;
+            var ollamaResponse = await response.Content.ReadFromJsonAsync<OllamaResponse>(cancellationToken: cancellationToken);
+            return ollamaResponse?.Response?.Trim() ?? string.Empty;
+        }
+        catch (HttpRequestException httpEx)
+        {
+            return $"# Connection Error: Cannot reach Ollama at http://localhost:11434/api/generate - {httpEx.Message}";
         }
         catch (Exception ex)
         {
-            return $"# Error contacting AI provider ({settings.AiProvider}): {ex.Message}";
+            return $"# Error: {ex.GetType().Name}: {ex.Message}";
         }
     }
 

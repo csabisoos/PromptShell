@@ -1,82 +1,109 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:PromptShell.ViewModels"
+        xmlns:local="using:PromptShell.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="950" d:DesignHeight="600"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="PromptShell.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="PromptShell"
-        Background="#1E1E1E">
+        Background="#121214">
 
-    <Grid RowDefinitions="Auto, *, Auto, Auto" Margin="15">
-        
-        <Border Grid.Row="0" Background="#2D2D2D" CornerRadius="4" Padding="10" Margin="0,0,0,15">
+    <Window.Resources>
+        <local:StringComparisonConverter x:Key="StringComparisonConverter"/>
+    </Window.Resources>
+
+    <Grid RowDefinitions="Auto, *, Auto" Background="#121214" Margin="0">
+        <!-- HEADER -->
+        <Border Grid.Row="0" Background="#1A1A1E" BorderBrush="#27272C" BorderThickness="0,0,0,1" Padding="24,16">
             <Grid ColumnDefinitions="Auto, *, Auto">
-                <TextBlock Grid.Column="0" Text="Active Directory:" Foreground="#858585" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,10,0"/>
-                <TextBlock Grid.Column="1" Text="{Binding CurrentWorkingDirectory}" Foreground="#4B6EAF" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="Courier New, monospace"/>
-                <Button Grid.Column="2" Name="BrowseFolderButton" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#3E3E42" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
-            </Grid>
-        </Border>
-        
-        <Grid Grid.Row="1" ColumnDefinitions="*, 1.2*" Margin="0,0,0,15">
-            
-            <Border Grid.Column="0" Background="#121212" CornerRadius="4" Padding="10" Margin="0,0,10,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <TextBlock Text="{Binding TerminalOutput}" Foreground="#00FF00" FontFamily="Courier New, Consolas, monospace" FontSize="12" TextWrapping="Wrap"/>
-                </ScrollViewer>
-            </Border>
-            
-            <Border Grid.Column="1" Background="#252526" BorderBrush="#333337" BorderThickness="1" CornerRadius="4" Padding="15">
-                <Grid RowDefinitions="Auto, *">
-                    <Grid Grid.Row="0" ColumnDefinitions="*, Auto, Auto" Margin="0,0,0,10">
-                        <TextBlock Grid.Column="0" Text="✨ AI Smart Interpretation" Foreground="#4B6EAF" FontWeight="Bold" VerticalAlignment="Center"/>
-                        <Button Grid.Column="1" Content="Copy" Command="{Binding CopyExplanationToClipboardCommand}" Background="#2D2D30" Foreground="White" FontSize="11" Padding="8,4" Margin="5,0"/>
-                        <Button Grid.Column="2" Content="Clear" Command="{Binding ClearConsoleCommand}" Background="#2D2D30" Foreground="White" FontSize="11" Padding="8,4"/>
-                    </Grid>
-                    
-                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                        <TextBlock Text="{Binding AiExplanation}" Foreground="White" FontSize="13" TextWrapping="Wrap" FontFamily="Inter, System-UI, sans-serif"/>
-                    </ScrollViewer>
-                </Grid>
-            </Border>
-        </Grid>
-        
-        <Border Grid.Row="2" Background="#332B00" BorderBrush="#8A7300" BorderThickness="1" CornerRadius="4" Padding="15,10" Margin="0,0,0,15" IsVisible="{Binding IsPendingApproval}">
-            <Grid ColumnDefinitions="*, Auto, Auto">
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="Do you want to execute this modification command?" Foreground="#FFD700" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding PendingCommand}" Foreground="White" FontFamily="Courier New, monospace" Margin="0,5,0,0"/>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="📁" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="Active Folder" Foreground="#8E8E93" FontSize="11"/>
+                        <TextBlock Text="{Binding CurrentWorkingDirectory}" Foreground="#A9A9B3" FontSize="12" FontFamily="Cascadia Code, Courier New" TextTrimming="CharacterEllipsis" MaxWidth="500"/>
+                    </StackPanel>
                 </StackPanel>
-                <Button Grid.Column="1" Content="Yes, Execute" Command="{Binding ApproveCommandCommand}" Background="#28A745" Foreground="White" Margin="10,0,0,0" Padding="15,8"/>
-                <Button Grid.Column="2" Content="No, Cancel" Command="{Binding RejectCommandCommand}" Background="#DC3545" Foreground="White" Margin="10,0,0,0" Padding="15,8"/>
+                <Button Grid.Column="2" Name="BrowseFolderButton" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#007AFF" Foreground="White" Padding="12,8" CornerRadius="8" FontSize="11" Cursor="Hand"/>
             </Grid>
         </Border>
-        
-        <Grid Grid.Row="3" ColumnDefinitions="*, Auto" IsEnabled="{Binding !IsPendingApproval}">
-            <TextBox Grid.Column="0" 
-                     Text="{Binding InputCommand, Mode=TwoWay}" 
-                     PlaceholderText="Ask AI to do something in this directory (e.g., 'list text files' or 'create test folder')..."
-                     Background="#2B2B2B"
-                     Foreground="White"
-                     BorderBrush="#3C3F41"
-                     VerticalContentAlignment="Center">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding ExecuteTerminalCommandCommand}"/>
-                    <KeyBinding Gesture="Up" Command="{Binding NavigateHistoryUpCommand}"/>
-                    <KeyBinding Gesture="Down" Command="{Binding NavigateHistoryDownCommand}"/>
-                </TextBox.KeyBindings>
-            </TextBox>
-            <Button Grid.Column="1" 
-                    Content="Execute" 
-                    Command="{Binding ExecuteTerminalCommandCommand}"
-                    Margin="10,0,0,0"
-                    Padding="15,0"
-                    Background="#4B6EAF"
-                    Foreground="White"
-                    VerticalAlignment="Stretch"
-                    VerticalContentAlignment="Center"/>
-        </Grid>
+
+        <!-- CHAT -->
+        <Border Grid.Row="1" Background="#121214" Padding="0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,16">
+                <ItemsControl ItemsSource="{Binding ChatTimeline}" Background="Transparent">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,4,0,4">
+                                <!-- USER -->
+                                <StackPanel HorizontalAlignment="Right" MaxWidth="650" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=User}">
+                                    <Border Background="#007AFF" CornerRadius="14" Padding="14,10">
+                                        <StackPanel MaxWidth="600" Spacing="6">
+                                            <TextBlock Text="{Binding Message}" Foreground="#FFFFFF" FontSize="13" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Timestamp}" Foreground="#E0E0E0" FontSize="9"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- AI -->
+                                <StackPanel HorizontalAlignment="Left" MaxWidth="650" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=AI}">
+                                    <Border Background="#1A1A1E" BorderBrush="#27272C" BorderThickness="1" CornerRadius="14" Padding="14,10">
+                                        <StackPanel MaxWidth="600" Spacing="8">
+                                            <TextBlock Text="{Binding Message}" Foreground="#F0F0F0" FontSize="13" TextWrapping="Wrap"/>
+                                            <Expander IsVisible="{Binding HasTechnicalDetails}" Background="Transparent" Padding="0">
+                                                <Expander.Header>
+                                                    <TextBlock Text="📋 Details" Foreground="#8E8E93" FontSize="10"/>
+                                                </Expander.Header>
+                                                <Border Background="#0F0F11" BorderBrush="#27272C" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,6,0,0">
+                                                    <TextBlock Text="{Binding RawTechnicalDetails}" Foreground="#4FD585" FontSize="9" FontFamily="Cascadia Code, Courier New" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </Expander>
+                                            <TextBlock Text="{Binding Timestamp}" Foreground="#8E8E93" FontSize="9"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- ACTION -->
+                                <StackPanel HorizontalAlignment="Left" MaxWidth="650" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=ActionCard}">
+                                    <Border Background="#1A1A1E" BorderBrush="#D19A66" BorderThickness="2" CornerRadius="14" Padding="14,12">
+                                        <StackPanel MaxWidth="600" Spacing="10">
+                                            <TextBlock Text="{Binding Message}" Foreground="#F0F0F0" FontSize="13" FontWeight="Bold" TextWrapping="Wrap"/>
+                                            <Border Background="#0F0F11" BorderBrush="#27272C" BorderThickness="1" CornerRadius="6" Padding="10,8">
+                                                <TextBlock Text="{Binding PendingCommand}" Foreground="#A9A9B3" FontSize="11" FontFamily="Cascadia Code, Courier New" TextWrapping="Wrap"/>
+                                            </Border>
+                                            <StackPanel Spacing="6" IsVisible="{Binding IsActionPending}">
+                                                <Button Content="✓ Approve" Foreground="#FFFFFF" Background="#34C759" Padding="12,8" CornerRadius="6" FontSize="11" HorizontalAlignment="Stretch"/>
+                                                <Button Content="✕ Reject" Foreground="#A9A9B3" Background="Transparent" BorderBrush="#8E8E93" BorderThickness="1" Padding="12,8" CornerRadius="6" FontSize="11" HorizontalAlignment="Stretch"/>
+                                            </StackPanel>
+                                            <TextBlock IsVisible="{Binding !IsActionPending}" Text="✓ Completed" Foreground="#8E8E93" FontSize="10" TextAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- SYSTEM -->
+                                <TextBlock HorizontalAlignment="Center" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=System}" Text="{Binding Message}" Foreground="#8E8E93" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+
+        <!-- INPUT -->
+        <Border Grid.Row="2" Background="#1A1A1E" BorderBrush="#27272C" BorderThickness="0,1,0,0" Padding="24,14">
+            <Grid ColumnDefinitions="*, Auto, Auto">
+                <TextBox Grid.Column="0" Text="{Binding InputCommand, Mode=TwoWay}" PlaceholderText="Ask anything..." Background="#0F0F11" Foreground="#F0F0F0" BorderBrush="#27272C" BorderThickness="1" CornerRadius="10" Padding="14,10" FontSize="13" Height="44" VerticalContentAlignment="Center">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding ExecuteTerminalCommandCommand}"/>
+                        <KeyBinding Gesture="Up" Command="{Binding NavigateHistoryUpCommand}"/>
+                        <KeyBinding Gesture="Down" Command="{Binding NavigateHistoryDownCommand}"/>
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="1" Content="Clear" Background="Transparent" BorderBrush="#8E8E93" BorderThickness="1" Padding="12,8" CornerRadius="6" FontSize="11" Margin="10,0,0,0"/>
+                <Button Grid.Column="2" Content="Send" Command="{Binding ExecuteTerminalCommandCommand}" Foreground="#FFFFFF" Background="#007AFF" BorderThickness="0" Padding="18,8" CornerRadius="6" FontSize="12" FontWeight="SemiBold" Margin="8,0,0,0"/>
+            </Grid>
+        </Border>
     </Grid>
 </Window>
