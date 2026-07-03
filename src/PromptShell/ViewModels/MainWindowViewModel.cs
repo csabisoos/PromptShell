@@ -43,7 +43,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _terminalService = new TerminalService();
         _aiInferenceService = new AiInferenceService();
         
-        ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = "Hello! I am PromptShell. How can I assist you with your workspace today?" });
+        ChatTimeline.Add(new AiChatMessage { Message = "Hello! I am PromptShell. How can I assist you with your workspace today?" });
     }
 
     [RelayCommand]
@@ -56,7 +56,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _history.Add(userRequest);
         _historyIndex = _history.Count;
         
-        ChatTimeline.Add(new ChatMessage { Sender = "User", Message = userRequest });
+        ChatTimeline.Add(new UserChatMessage { Message = userRequest });
         InputCommand = string.Empty;
 
         try
@@ -84,14 +84,14 @@ public partial class MainWindowViewModel : ViewModelBase
 
             if (string.IsNullOrWhiteSpace(aiResponse) || aiResponse.StartsWith("# Error"))
             {
-                ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = aiResponse.StartsWith("# Error") ? aiResponse : "Sorry, I couldn't internalize that request." });
+                ChatTimeline.Add(new AiChatMessage { Message = aiResponse.StartsWith("# Error") ? aiResponse : "Sorry, I couldn't internalize that request." });
                 return;
             }
             
             if (aiResponse.StartsWith("?"))
             {
                 _lastAiQuestion = aiResponse.TrimStart('?');
-                ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = _lastAiQuestion });
+                ChatTimeline.Add(new AiChatMessage { Message = _lastAiQuestion });
                 LogLatestSession(directoryContext, userRequest, "N/A", _lastAiQuestion);
                 return;
             }
@@ -104,12 +104,10 @@ public partial class MainWindowViewModel : ViewModelBase
                 PendingCommand = aiResponse;
                 IsPendingApproval = true;
                 
-                ChatTimeline.Add(new ChatMessage 
+                ChatTimeline.Add(new ActionCardChatMessage 
                 { 
-                    Sender = "ActionCard", 
-                    Message = $"PromptShell wants to execute a modification command.",
-                    PendingCommand = aiResponse,
-                    IsActionPending = true
+                    Message = "PromptShell wants to execute a modification command.",
+                    PendingCommand = aiResponse
                 });
                 LogLatestSession(directoryContext, userRequest, aiResponse, "Pending user approval...");
             }
@@ -120,7 +118,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ChatTimeline.Add(new ChatMessage { Sender = "System", Message = $"Fatal Error: {ex.Message}" });
+            ChatTimeline.Add(new SystemChatMessage { Message = $"Fatal Error: {ex.Message}" });
         }
     }
 
@@ -132,9 +130,8 @@ public partial class MainWindowViewModel : ViewModelBase
         TerminalOutput = result.IsSuccessful ? result.Output : result.Error;
         AiExplanation = explanation;
         
-        ChatTimeline.Add(new ChatMessage
+        ChatTimeline.Add(new AiChatMessage
         {
-            Sender = "AI",
             Message = explanation,
             RawTechnicalDetails = $"[Executed Command]: {command}\n\n[Exit Code]: {result.ExitCode}\n\n[Console Output]:\n{(result.IsSuccessful ? result.Output : result.Error)}"
         });
@@ -148,7 +145,7 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(PendingCommand)) return;
         
-        var card = ChatTimeline.LastOrDefault(m => m.Sender == "ActionCard");
+        var card = ChatTimeline.LastOrDefault(m => m is ActionCardChatMessage) as ActionCardChatMessage;
         if (card != null) card.IsActionPending = false;
 
         string cmdToRun = PendingCommand;
@@ -161,14 +158,14 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     public void RejectCommand()
     {
-        var card = ChatTimeline.LastOrDefault(m => m.Sender == "ActionCard");
+        var card = ChatTimeline.LastOrDefault(m => m is ActionCardChatMessage) as ActionCardChatMessage;
         if (card != null) card.IsActionPending = false;
 
         AppendToCommandLog($"REJECTED: {PendingCommand}", -1, false);
         PendingCommand = string.Empty;
         IsPendingApproval = false;
-        
-        ChatTimeline.Add(new ChatMessage { Sender = "System", Message = "Execution cancelled by user." });
+
+        ChatTimeline.Add(new SystemChatMessage { Message = "The proposed command has been rejected by the user." });
     }
 
     private void AppendToCommandLog(string command, int exitCode, bool isSuccess)
@@ -199,7 +196,12 @@ public partial class MainWindowViewModel : ViewModelBase
 
     [RelayCommand] public void NavigateHistoryUp() { if (_history.Count == 0 || _historyIndex <= 0) return; _historyIndex--; InputCommand = _history[_historyIndex]; }
     [RelayCommand] public void NavigateHistoryDown() { if (_historyIndex < _history.Count - 1) { _historyIndex++; InputCommand = _history[_historyIndex]; } else { _historyIndex = _history.Count; InputCommand = string.Empty; } }
-    [RelayCommand] private void ClearConsole() { ChatTimeline.Clear(); ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = "Chat timeline cleared. How can I help you now?" }); }
+    [RelayCommand] 
+    private void ClearConsole() 
+    { 
+        ChatTimeline.Clear(); 
+        ChatTimeline.Add(new AiChatMessage { Message = "Chat timeline cleared. How can I help you now?" }); 
+    }
     [RelayCommand] private async Task CopyExplanationToClipboard() { if (!string.IsNullOrWhiteSpace(AiExplanation) && CopyToClipboardAction != null) await CopyToClipboardAction(AiExplanation); }
     private bool RequiresApproval(string command) { var tokens = command.Split(new[] { ' ', '"', '\'' }, StringSplitOptions.RemoveEmptyEntries); return tokens.Any(token => DestructiveKeywords.Contains(token)) || command.Contains(">") || command.Contains(">>"); }
 }

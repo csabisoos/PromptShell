@@ -1,113 +1,130 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:PromptShell.ViewModels"
-        xmlns:local="using:PromptShell.Views"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        xmlns:m="using:PromptShell.Models"
         x:Class="PromptShell.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="PromptShell"
+        Title="PromptShell Autobot"
+        Width="900" Height="650"
+        WindowStartupLocation="CenterScreen"
         Background="#121214">
 
-    <Window.Resources>
-        <local:StringComparisonConverter x:Key="StringComparisonConverter"/>
-    </Window.Resources>
+    <Window.Styles>
+        <Style Selector="ListBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+        </Style>
+        <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+    </Window.Styles>
 
-    <Grid RowDefinitions="Auto, *, Auto" Background="#121214" Margin="0">
-        <!-- HEADER -->
-        <Border Grid.Row="0" Background="#1A1A1E" BorderBrush="#27272C" BorderThickness="0,0,0,1" Padding="24,16">
-            <Grid ColumnDefinitions="Auto, *, Auto">
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <TextBlock Text="📁" FontSize="16" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock Text="Active Folder" Foreground="#8E8E93" FontSize="11"/>
-                        <TextBlock Text="{Binding CurrentWorkingDirectory}" Foreground="#A9A9B3" FontSize="12" FontFamily="Cascadia Code, Courier New" TextTrimming="CharacterEllipsis" MaxWidth="500"/>
-                    </StackPanel>
+    <Grid RowDefinitions="Auto, *, Auto" Margin="15">
+        
+        <!-- FELSŐ SÁV: Aktív mappa választó -->
+        <Border Grid.Row="0" Background="#1A1A1E" CornerRadius="8" Padding="12" Margin="0,0,0,15">
+            <Grid ColumnDefinitions="*, Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Active Directory: " Foreground="#8E8E8E" FontWeight="Bold"/>
+                    <TextBlock Text="{Binding CurrentWorkingDirectory}" Foreground="#007AFF" Margin="5,0,0,0"/>
                 </StackPanel>
-                <Button Grid.Column="2" Name="BrowseFolderButton" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#007AFF" Foreground="White" Padding="12,8" CornerRadius="8" FontSize="11" Cursor="Hand"/>
+                <Button Grid.Column="1" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" 
+                        Background="#2C2C2E" Foreground="White" CornerRadius="4" Padding="10,5"/>
             </Grid>
         </Border>
 
-        <!-- CHAT -->
-        <Border Grid.Row="1" Background="#121214" Padding="0">
-            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="24,16">
-                <ItemsControl ItemsSource="{Binding ChatTimeline}" Background="Transparent">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Grid Margin="0,4,0,4">
-                                <!-- USER -->
-                                <StackPanel HorizontalAlignment="Right" MaxWidth="650" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=User}">
-                                    <Border Background="#007AFF" CornerRadius="14" Padding="14,10">
-                                        <StackPanel MaxWidth="600" Spacing="6">
-                                            <TextBlock Text="{Binding Message}" Foreground="#FFFFFF" FontSize="13" TextWrapping="Wrap"/>
-                                            <TextBlock Text="{Binding Timestamp}" Foreground="#E0E0E0" FontSize="9"/>
-                                        </StackPanel>
-                                    </Border>
+        <!-- KÖZÉPSŐ PANEL: Intelligens Chat Idővonal -->
+        <ListBox Grid.Row="1" 
+                 ItemsSource="{Binding ChatTimeline}" 
+                 Background="Transparent" 
+                 BorderThickness="0"
+                 ClipToBounds="True"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.DataTemplates>
+                
+                <!-- 1. USER BUBORÉK SABLON -->
+                <DataTemplate DataType="m:UserChatMessage">
+                    <Grid HorizontalAlignment="Right" Margin="50,6,5,6" x:DataType="m:UserChatMessage">
+                        <Border Background="#007AFF" CornerRadius="16,16,2,16" Padding="14,10" MaxWidth="650">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Message}" Foreground="White" TextWrapping="Wrap" FontSize="14"/>
+                                <TextBlock Text="{Binding Timestamp}" Foreground="#D1E6FF" FontSize="10" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+
+                <!-- 2. AI BUBORÉK SABLON -->
+                <DataTemplate DataType="m:AiChatMessage">
+                    <Grid HorizontalAlignment="Left" Margin="5,6,50,6" x:DataType="m:AiChatMessage">
+                        <Border Background="#1A1A1E" CornerRadius="16,16,16,2" Padding="14,10" MaxWidth="650">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Message}" Foreground="#E5E5EA" TextWrapping="Wrap" FontSize="14"/>
+                                
+                                <Expander Header="Show background logs" IsVisible="{Binding HasTechnicalDetails}" 
+                                          Background="#121214" Foreground="#8E8E93" Margin="0,8,0,0" CornerRadius="8">
+                                    <ScrollViewer MaxHeight="180">
+                                        <TextBlock Text="{Binding RawTechnicalDetails}" Foreground="#34C759" FontFamily="Courier New" FontSize="12" TextWrapping="Wrap"/>
+                                    </ScrollViewer>
+                                </Expander>
+                                
+                                <TextBlock Text="{Binding Timestamp}" Foreground="#636366" FontSize="10" HorizontalAlignment="Left" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+
+                <!-- 3. ACTION CARD SABLON -->
+                <DataTemplate DataType="m:ActionCardChatMessage">
+                    <Grid HorizontalAlignment="Left" Margin="5,10,50,10" x:DataType="m:ActionCardChatMessage">
+                        <Border Background="#2C2114" BorderBrush="#D19A66" BorderThickness="1" CornerRadius="12" Padding="16" MaxWidth="650">
+                            <StackPanel>
+                                <TextBlock Text="🛠️ Action Required" Foreground="#D19A66" FontWeight="Bold" FontSize="15" Margin="0,0,0,6"/>
+                                <TextBlock Text="{Binding Message}" Foreground="White" FontSize="13" Margin="0,0,0,10"/>
+                                <Border Background="#121214" Padding="12" CornerRadius="8" Margin="0,0,0,12">
+                                    <TextBlock Text="{Binding PendingCommand}" Foreground="#E5C07B" FontFamily="Courier New" FontSize="13" TextWrapping="Wrap"/>
+                                </Border>
+                                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsActionPending}">
+                                    <Button Content="Approve &amp; Run" 
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).ApproveCommandCommand}" 
+                                            Background="#34C759" Foreground="Black" FontWeight="Bold" Padding="16,8" CornerRadius="6"/>
+                                    <Button Content="Reject" 
+                                            Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).RejectCommandCommand}" 
+                                            Background="#FF3B30" Foreground="White" Padding="16,8" CornerRadius="6"/>
                                 </StackPanel>
+                                <TextBlock Text="✓ Resolved" Foreground="#636366" FontStyle="Italic" IsVisible="{Binding !IsActionPending}"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
 
-                                <!-- AI -->
-                                <StackPanel HorizontalAlignment="Left" MaxWidth="650" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=AI}">
-                                    <Border Background="#1A1A1E" BorderBrush="#27272C" BorderThickness="1" CornerRadius="14" Padding="14,10">
-                                        <StackPanel MaxWidth="600" Spacing="8">
-                                            <TextBlock Text="{Binding Message}" Foreground="#F0F0F0" FontSize="13" TextWrapping="Wrap"/>
-                                            <Expander IsVisible="{Binding HasTechnicalDetails}" Background="Transparent" Padding="0">
-                                                <Expander.Header>
-                                                    <TextBlock Text="📋 Details" Foreground="#8E8E93" FontSize="10"/>
-                                                </Expander.Header>
-                                                <Border Background="#0F0F11" BorderBrush="#27272C" BorderThickness="1" CornerRadius="6" Padding="8,6" Margin="0,6,0,0">
-                                                    <TextBlock Text="{Binding RawTechnicalDetails}" Foreground="#4FD585" FontSize="9" FontFamily="Cascadia Code, Courier New" TextWrapping="Wrap"/>
-                                                </Border>
-                                            </Expander>
-                                            <TextBlock Text="{Binding Timestamp}" Foreground="#8E8E93" FontSize="9"/>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
+                <!-- 4. SYSTEM SABLON -->
+                <DataTemplate DataType="m:SystemChatMessage">
+                    <Grid HorizontalAlignment="Center" Margin="5,4,5,4" x:DataType="m:SystemChatMessage">
+                        <Border Background="#2A1A1A" CornerRadius="8" Padding="10,6">
+                            <TextBlock Text="{Binding Message}" Foreground="#FF3B30" FontSize="12" FontStyle="Italic"/>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
 
-                                <!-- ACTION -->
-                                <StackPanel HorizontalAlignment="Left" MaxWidth="650" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=ActionCard}">
-                                    <Border Background="#1A1A1E" BorderBrush="#D19A66" BorderThickness="2" CornerRadius="14" Padding="14,12">
-                                        <StackPanel MaxWidth="600" Spacing="10">
-                                            <TextBlock Text="{Binding Message}" Foreground="#F0F0F0" FontSize="13" FontWeight="Bold" TextWrapping="Wrap"/>
-                                            <Border Background="#0F0F11" BorderBrush="#27272C" BorderThickness="1" CornerRadius="6" Padding="10,8">
-                                                <TextBlock Text="{Binding PendingCommand}" Foreground="#A9A9B3" FontSize="11" FontFamily="Cascadia Code, Courier New" TextWrapping="Wrap"/>
-                                            </Border>
-                                            <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsActionPending}">
-                                                <Button Content="Approve &amp; Run" 
-                                                        Command="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).ApproveCommandCommand}" 
-                                                        Background="#34C759" Foreground="Black" FontWeight="Bold" Padding="15,6" CornerRadius="4"/>
-    
-                                                <Button Content="Reject" 
-                                                        Command="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).RejectCommandCommand}" 
-                                                        Background="#FF3B30" Foreground="White" Padding="15,6" CornerRadius="4"/>
-                                            </StackPanel>
-                                            <TextBlock IsVisible="{Binding !IsActionPending}" Text="✓ Completed" Foreground="#8E8E93" FontSize="10" TextAlignment="Center"/>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
+            </ListBox.DataTemplates>
+        </ListBox>
 
-                                <!-- SYSTEM -->
-                                <TextBlock HorizontalAlignment="Center" IsVisible="{Binding Sender, Converter={StaticResource StringComparisonConverter}, ConverterParameter=System}" Text="{Binding Message}" Foreground="#8E8E93" FontSize="11" TextAlignment="Center" TextWrapping="Wrap"/>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
-        </Border>
-
-        <!-- INPUT -->
-        <Border Grid.Row="2" Background="#1A1A1E" BorderBrush="#27272C" BorderThickness="0,1,0,0" Padding="24,14">
+        <!-- ALSÓ SÁV: Chat Input Mező és Tisztítás -->
+        <Border Grid.Row="2" Background="#1A1A1E" CornerRadius="10" Padding="10" Margin="0,15,0,0">
             <Grid ColumnDefinitions="*, Auto, Auto">
-                <TextBox Grid.Column="0" Text="{Binding InputCommand, Mode=TwoWay}" PlaceholderText="Ask anything..." Background="#0F0F11" Foreground="#F0F0F0" BorderBrush="#27272C" BorderThickness="1" CornerRadius="10" Padding="14,10" FontSize="13" Height="44" VerticalContentAlignment="Center">
+                <TextBox Grid.Column="0" Text="{Binding InputCommand}" PlaceholderText="Ask anything..." 
+                         Background="Transparent" BorderThickness="0" Foreground="White" CaretBrush="White" FontSize="14" VerticalAlignment="Center">
                     <TextBox.KeyBindings>
                         <KeyBinding Gesture="Enter" Command="{Binding ExecuteTerminalCommandCommand}"/>
                         <KeyBinding Gesture="Up" Command="{Binding NavigateHistoryUpCommand}"/>
                         <KeyBinding Gesture="Down" Command="{Binding NavigateHistoryDownCommand}"/>
                     </TextBox.KeyBindings>
                 </TextBox>
-                <Button Grid.Column="1" Content="Clear" Background="Transparent" BorderBrush="#8E8E93" BorderThickness="1" Padding="12,8" CornerRadius="6" FontSize="11" Margin="10,0,0,0"/>
-                <Button Grid.Column="2" Content="Send" Command="{Binding ExecuteTerminalCommandCommand}" Foreground="#FFFFFF" Background="#007AFF" BorderThickness="0" Padding="18,8" CornerRadius="6" FontSize="12" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                <Button Grid.Column="1" Content="Clear" Command="{Binding ClearConsoleCommand}" Background="#2C2C2E" Foreground="#FF3B30" Margin="6,0" Padding="14,8" CornerRadius="6"/>
+                <Button Grid.Column="2" Content="Send" Command="{Binding ExecuteTerminalCommandCommand}" Background="#007AFF" Foreground="White" FontWeight="Bold" Padding="16,8" CornerRadius="6"/>
             </Grid>
         </Border>
     </Grid>
