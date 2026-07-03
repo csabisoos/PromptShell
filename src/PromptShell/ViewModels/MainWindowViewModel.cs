@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PromptShell.Models;
 using PromptShell.Services;
 
 namespace PromptShell.ViewModels;
@@ -13,101 +15,87 @@ namespace PromptShell.ViewModels;
 public partial class MainWindowViewModel : ViewModelBase
 {
     private readonly ITerminalService _terminalService;
-    private readonly IOllamaService _ollamaService;
-    private readonly IOutputInterpreterService _outputInterpreterService;
-    
+    private readonly IAiInferenceService _aiInferenceService;
+
     private readonly List<string> _history = new();
     private int _historyIndex = -1;
     private string _lastAiQuestion = string.Empty;
-    
+
     private static readonly string CommandsLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "history_commands.log");
     private static readonly string SessionLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "latest_session.log");
     
-    public Func<string, Task>? CopyToClipboardAction { get; set; }
-    
-    [ObservableProperty]
-    private string _inputCommand = string.Empty;
-    
-    [ObservableProperty]
-    private string _terminalOutput = "PromptShell Ready... Ask me anything!";
-    
-    [ObservableProperty]
-    private string _aiExplanation = string.Empty;
+    public ObservableCollection<ChatMessage> ChatTimeline { get; } = new();
 
-    [ObservableProperty] 
-    private bool _isPendingApproval = false;
+    [ObservableProperty] private AppSettings _settings = new();
+    [ObservableProperty] private string _inputCommand = string.Empty;
+    [ObservableProperty] private bool _isPendingApproval = false;
+    [ObservableProperty] private string _pendingCommand = string.Empty;
+    [ObservableProperty] private string _currentWorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    [ObservableProperty] private string _terminalOutput = string.Empty;
+    [ObservableProperty] private string _aiExplanation = string.Empty;
     
-    [ObservableProperty]
-    private string _pendingCommand = string.Empty;
-    
-    [ObservableProperty]
-    private string _currentWorkingDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-    
-    private static readonly string[] DestructiveKeywords = 
-    { 
-        "rm", "mkdir", "touch", "mv", "cp", "chmod", "chown", 
-        "git commit", "git push", "git rm", "git merge", "git rebase", 
-        "dd", "sudo", ">>", ">", "sed", "awk", "tee" 
-    };
-    
+    public Func<string, Task>? CopyToClipboardAction { get; set; }
+
+    private static readonly string[] DestructiveKeywords = { "rm", "mkdir", "touch", "mv", "cp", "chmod", "chown", "git commit", "git push" };
+
     public MainWindowViewModel()
     {
         _terminalService = new TerminalService();
-        _ollamaService = new OllamaService();
-        _outputInterpreterService = new OutputInterpreterService();
+        _aiInferenceService = new AiInferenceService();
+        
+        ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = "Hello! I am PromptShell. How can I assist you with your workspace today?" });
     }
-    
+
     [RelayCommand]
     private async Task ExecuteTerminalCommandAsync()
     {
-        if (string.IsNullOrWhiteSpace(InputCommand))
+        if (string.IsNullOrWhiteSpace(InputCommand) || IsPendingApproval)
             return;
-        
+
         string userRequest = InputCommand;
         _history.Add(userRequest);
         _historyIndex = _history.Count;
         
+        ChatTimeline.Add(new ChatMessage { Sender = "User", Message = userRequest });
         InputCommand = string.Empty;
-        AiExplanation = string.Empty;
-        
+
         try
         {
-            TerminalOutput = $"[AI] Analyzing directory context and request...";
-            
             string directoryContext = "Empty folder";
             if (Directory.Exists(CurrentWorkingDirectory))
             {
-                var files = Directory.GetFiles(CurrentWorkingDirectory).Select(Path.GetFileName);
-                var dirs = Directory.GetDirectories(CurrentWorkingDirectory).Select(Path.GetFileName);
-                directoryContext = string.Join(", ", dirs.Concat(files));
+                string[] excludedFolders = { "node_modules", "bin", "obj", ".git", ".idea", ".vs", "dist", "out" };
+                var allowedFiles = Directory.GetFiles(CurrentWorkingDirectory).Select(Path.GetFileName)
+                    .Where(file => file != null && !file.StartsWith(".") && !file.EndsWith(".png") && !file.EndsWith(".jpg") && !file.EndsWith(".exe") && !file.EndsWith(".dll"));
+                var allowedDirs = Directory.GetDirectories(CurrentWorkingDirectory).Select(Path.GetFileName)
+                    .Where(dir => dir != null && !dir.StartsWith(".") && !excludedFolders.Contains(dir));
+                
+                var finalContextList = allowedDirs.Concat(allowedFiles).ToList();
+                if (finalContextList.Any()) directoryContext = string.Join(", ", finalContextList);
             }
             
             string finalPromptToSend = userRequest;
             if (!string.IsNullOrWhiteSpace(_lastAiQuestion))
             {
-                finalPromptToSend = $"Context of ongoing conversation:\n" +
-                                    $"AI previously asked: '{_lastAiQuestion}'\n" +
-                                    $"User replied: '{userRequest}'\n\n" +
-                                    $"Based on this reply, convert the original intent into the final command.";
+                finalPromptToSend = $"Context of ongoing conversation:\nAI previously asked: '{_lastAiQuestion}'\nUser replied: '{userRequest}'\n\nConvert into final command.";
             }
-            
-            string aiResponse = await _ollamaService.GenerateCommandAsync(finalPromptToSend, directoryContext);
+
+            string aiResponse = await _aiInferenceService.GenerateCommandAsync(finalPromptToSend, directoryContext, Settings);
 
             if (string.IsNullOrWhiteSpace(aiResponse) || aiResponse.StartsWith("# Error"))
             {
-                TerminalOutput = aiResponse.StartsWith("# Error") ? aiResponse : "[AI Error] Invalid request.";
+                ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = aiResponse.StartsWith("# Error") ? aiResponse : "Sorry, I couldn't internalize that request." });
                 return;
             }
             
             if (aiResponse.StartsWith("?"))
             {
                 _lastAiQuestion = aiResponse.TrimStart('?');
-                AiExplanation = aiResponse.TrimStart('?');
-                TerminalOutput = "PromptShell: The AI needs more information to proceed. See the Smart Interpretation panel.";
-                LogLatestSession(directoryContext, userRequest, "N/A (Clarification requested)", _lastAiQuestion);
+                ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = _lastAiQuestion });
+                LogLatestSession(directoryContext, userRequest, "N/A", _lastAiQuestion);
                 return;
             }
-            
+
             string activeQuestionContext = _lastAiQuestion;
             _lastAiQuestion = string.Empty;
             
@@ -115,7 +103,14 @@ public partial class MainWindowViewModel : ViewModelBase
             {
                 PendingCommand = aiResponse;
                 IsPendingApproval = true;
-                TerminalOutput = $"[AI] Generated command: {aiResponse}\n\n⚠️ WARNING: Modification detected. Approval required!";
+                
+                ChatTimeline.Add(new ChatMessage 
+                { 
+                    Sender = "ActionCard", 
+                    Message = $"PromptShell wants to execute a modification command.",
+                    PendingCommand = aiResponse,
+                    IsActionPending = true
+                });
                 LogLatestSession(directoryContext, userRequest, aiResponse, "Pending user approval...");
             }
             else
@@ -125,107 +120,57 @@ public partial class MainWindowViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            TerminalOutput = $"[Fatal Error]: {ex.Message}";
+            ChatTimeline.Add(new ChatMessage { Sender = "System", Message = $"Fatal Error: {ex.Message}" });
         }
     }
-    
-    [RelayCommand]
-    public void NavigateHistoryUp()
-    {
-        if (_history.Count == 0 || _historyIndex <= 0) return;
-        _historyIndex--;
-        InputCommand = _history[_historyIndex];
-    }
-    
-    [RelayCommand]
-    public void NavigateHistoryDown()
-    {
-        if (_historyIndex < _history.Count - 1)
-        {
-            _historyIndex++;
-            InputCommand = _history[_historyIndex];
-        }
-        else
-        {
-            _historyIndex = _history.Count;
-            InputCommand = string.Empty;
-        }
-    }
-    
-    [RelayCommand]
-    private async Task CopyExplanationToClipboardAsync()
-    {
-        if (CopyToClipboardAction != null && !string.IsNullOrWhiteSpace(AiExplanation))
-        {
-            await CopyToClipboardAction(AiExplanation);
-        }
-    }
-    
-    [RelayCommand]
-    private void ClearConsole()
-    {
-        TerminalOutput = "Console cleared. PromptShell Ready.";
-        AiExplanation = string.Empty;
-    }
-    
-    [RelayCommand]
-    private async Task ApproveCommandAsync()
-    {
-        if (string.IsNullOrWhiteSpace(PendingCommand)) 
-            return;
 
-        string cmdToRun = PendingCommand;
-        ResetApprovalState();
-        
-        await RunAndAnalyzeCommandAsync(cmdToRun, "Cached on approval", "Approved command execution", "");
-    }
-    
-    [RelayCommand]
-    private void RejectCommand()
-    {
-        AppendToCommandLog($"REJECTED: {PendingCommand}", -1, false);
-        ResetApprovalState();
-        TerminalOutput = "Command execution cancelled by user.";
-    }
-    
-    private bool RequiresApproval(string command)
-    {
-        var tokens = command.Split(new[] { ' ', '"', '\'' }, StringSplitOptions.RemoveEmptyEntries);
-        return tokens.Any(token => DestructiveKeywords.Contains(token)) || command.Contains(">") || command.Contains(">>");
-    }
-    
     private async Task RunAndAnalyzeCommandAsync(string command, string directoryContext, string userRequest, string activeQuestionContext)
     {
-        TerminalOutput = $"[System] Running: {command}...";
         var result = await _terminalService.ExecuteCommandAsync(command, CurrentWorkingDirectory);
+        string explanation = await _aiInferenceService.InterpretResultAsync(command, result, Settings);
         
-        if (result.IsSuccessful)
-        {
-            TerminalOutput = $"[Raw Output]:\n{result.Output}";
-        }
-        else
-        {
-            TerminalOutput = $"[Raw Error Output - Exit Code: {result.ExitCode}]:\n{result.Error}";
-        }
-
-        TerminalOutput += "\n\n[AI] Analyzing result status...";
-        string explanation = await _outputInterpreterService.InterpretResultAsync(command, result);
-        
+        TerminalOutput = result.IsSuccessful ? result.Output : result.Error;
         AiExplanation = explanation;
         
-        if (result.IsSuccessful)
+        ChatTimeline.Add(new ChatMessage
         {
-            TerminalOutput = $"[Success]: {command}\n\n{result.Output}";
-        }
-        else
-        {
-            TerminalOutput = $"[Failure]: {command}\n\n{result.Error}";
-        }
-        
+            Sender = "AI",
+            Message = explanation,
+            RawTechnicalDetails = $"[Executed Command]: {command}\n\n[Exit Code]: {result.ExitCode}\n\n[Console Output]:\n{(result.IsSuccessful ? result.Output : result.Error)}"
+        });
+
         AppendToCommandLog(command, result.ExitCode, result.IsSuccessful);
         LogLatestSession(directoryContext, userRequest, command, explanation, result.Output, result.Error, result.ExitCode);
     }
-    
+
+    [RelayCommand]
+    public async Task ApproveCommandAsync()
+    {
+        if (string.IsNullOrWhiteSpace(PendingCommand)) return;
+        
+        var card = ChatTimeline.LastOrDefault(m => m.Sender == "ActionCard");
+        if (card != null) card.IsActionPending = false;
+
+        string cmdToRun = PendingCommand;
+        IsPendingApproval = false;
+        PendingCommand = string.Empty;
+        
+        await RunAndAnalyzeCommandAsync(cmdToRun, "Cached on approval", "Approved command execution", "");
+    }
+
+    [RelayCommand]
+    public void RejectCommand()
+    {
+        var card = ChatTimeline.LastOrDefault(m => m.Sender == "ActionCard");
+        if (card != null) card.IsActionPending = false;
+
+        AppendToCommandLog($"REJECTED: {PendingCommand}", -1, false);
+        PendingCommand = string.Empty;
+        IsPendingApproval = false;
+        
+        ChatTimeline.Add(new ChatMessage { Sender = "System", Message = "Execution cancelled by user." });
+    }
+
     private void AppendToCommandLog(string command, int exitCode, bool isSuccess)
     {
         try
@@ -233,55 +178,28 @@ public partial class MainWindowViewModel : ViewModelBase
             if (File.Exists(CommandsLogPath))
             {
                 var fileInfo = new FileInfo(CommandsLogPath);
-                if (fileInfo.Length > 5 * 1024 * 1024) 
-                {
-                    File.WriteAllText(CommandsLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Log cleared automatically due to size limit (5MB).{Environment.NewLine}", Encoding.UTF8);
-                }
+                if (fileInfo.Length > 5 * 1024 * 1024) File.WriteAllText(CommandsLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Log cleared automatically.{Environment.NewLine}", Encoding.UTF8);
             }
-            string logLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Status: {(isSuccess ? "SUCCESS" : "FAILED")} | Exit Code: {exitCode} | Command: {command}{Environment.NewLine}";
-            File.AppendAllText(CommandsLogPath, logLine, Encoding.UTF8);
+            File.AppendAllText(CommandsLogPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] Status: {(isSuccess ? "SUCCESS" : "FAILED")} | Command: {command}{Environment.NewLine}", Encoding.UTF8);
         }
-        catch { /* Fail-silent to prevent UI crashes if file is locked */ }
+        catch { /* ignore */ }
     }
-    
+
     private void LogLatestSession(string context, string userRequest, string generatedCommand, string aiExplanation, string stdout = "", string stderr = "", int? exitCode = null)
     {
         try
         {
             var sb = new StringBuilder();
-            sb.AppendLine("===============================================================================");
-            sb.AppendLine($"PROMPTSHELL SESSION LOG - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            sb.AppendLine("===============================================================================");
-            sb.AppendLine($"Working Directory: {CurrentWorkingDirectory}");
-            sb.AppendLine($"Directory Context: {context}");
-            sb.AppendLine($"User Request:      {userRequest}");
-            sb.AppendLine($"Generated Command: {generatedCommand}");
-            if (exitCode.HasValue) sb.AppendLine($"Execution Status:  Exit Code {exitCode.Value}");
-            sb.AppendLine("-------------------------------------------------------------------------------");
-            sb.AppendLine("AI SMART INTERPRETATION:");
-            sb.AppendLine(aiExplanation);
-            if (!string.IsNullOrWhiteSpace(stdout))
-            {
-                sb.AppendLine("-------------------------------------------------------------------------------");
-                sb.AppendLine("STANDARD OUTPUT:");
-                sb.AppendLine(stdout);
-            }
-            if (!string.IsNullOrWhiteSpace(stderr))
-            {
-                sb.AppendLine("-------------------------------------------------------------------------------");
-                sb.AppendLine("STANDARD ERROR:");
-                sb.AppendLine(stderr);
-            }
-            sb.AppendLine("===============================================================================");
-
+            sb.AppendLine($"PROMPTSHELL LOG - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            sb.AppendLine($"Directory: {context}\nRequest: {userRequest}\nCommand: {generatedCommand}\nAI Analysis: {aiExplanation}");
             File.WriteAllText(SessionLogPath, sb.ToString(), Encoding.UTF8);
         }
-        catch { /* Fail-silent */ }
+        catch { /* ignore */ }
     }
-    
-    private void ResetApprovalState()
-    {
-        PendingCommand = string.Empty;
-        IsPendingApproval = false;
-    }
+
+    [RelayCommand] public void NavigateHistoryUp() { if (_history.Count == 0 || _historyIndex <= 0) return; _historyIndex--; InputCommand = _history[_historyIndex]; }
+    [RelayCommand] public void NavigateHistoryDown() { if (_historyIndex < _history.Count - 1) { _historyIndex++; InputCommand = _history[_historyIndex]; } else { _historyIndex = _history.Count; InputCommand = string.Empty; } }
+    [RelayCommand] private void ClearConsole() { ChatTimeline.Clear(); ChatTimeline.Add(new ChatMessage { Sender = "AI", Message = "Chat timeline cleared. How can I help you now?" }); }
+    [RelayCommand] private async Task CopyExplanationToClipboard() { if (!string.IsNullOrWhiteSpace(AiExplanation) && CopyToClipboardAction != null) await CopyToClipboardAction(AiExplanation); }
+    private bool RequiresApproval(string command) { var tokens = command.Split(new[] { ' ', '"', '\'' }, StringSplitOptions.RemoveEmptyEntries); return tokens.Any(token => DestructiveKeywords.Contains(token)) || command.Contains(">") || command.Contains(">>"); }
 }

@@ -16,7 +16,7 @@
             <Grid ColumnDefinitions="Auto, *, Auto">
                 <TextBlock Grid.Column="0" Text="Active Directory:" Foreground="#858585" VerticalAlignment="Center" FontWeight="Bold" Margin="0,0,10,0"/>
                 <TextBlock Grid.Column="1" Text="{Binding CurrentWorkingDirectory}" Foreground="#4B6EAF" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontFamily="Courier New, monospace"/>
-                <Button Grid.Column="2" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#3E3E42" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
+                <Button Grid.Column="2" Name="BrowseFolderButton" Content="Browse Folder..." Click="BrowseFolderButton_OnClick" Background="#3E3E42" Foreground="White" Padding="10,5" Margin="10,0,0,0"/>
             </Grid>
         </Border>
         
@@ -57,15 +57,26 @@
         <Grid Grid.Row="3" ColumnDefinitions="*, Auto" IsEnabled="{Binding !IsPendingApproval}">
             <TextBox Grid.Column="0" 
                      Text="{Binding InputCommand, Mode=TwoWay}" 
-                     PlaceholderText="Ask AI to do something in this directory (e.g., 'show size of docs folder')..."
-                     Background="#2B2B2B" Foreground="White" BorderBrush="#3C3F41" VerticalContentAlignment="Center">
+                     PlaceholderText="Ask AI to do something in this directory (e.g., 'list text files' or 'create test folder')..."
+                     Background="#2B2B2B"
+                     Foreground="White"
+                     BorderBrush="#3C3F41"
+                     VerticalContentAlignment="Center">
                 <TextBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding ExecuteTerminalCommandCommand}"/>
                     <KeyBinding Gesture="Up" Command="{Binding NavigateHistoryUpCommand}"/>
                     <KeyBinding Gesture="Down" Command="{Binding NavigateHistoryDownCommand}"/>
                 </TextBox.KeyBindings>
             </TextBox>
-            <Button Grid.Column="1" Content="Execute" Command="{Binding ExecuteTerminalCommandCommand}" Margin="10,0,0,0" Padding="15,0" Background="#4B6EAF" Foreground="White" VerticalAlignment="Stretch" VerticalContentAlignment="Center"/>
+            <Button Grid.Column="1" 
+                    Content="Execute" 
+                    Command="{Binding ExecuteTerminalCommandCommand}"
+                    Margin="10,0,0,0"
+                    Padding="15,0"
+                    Background="#4B6EAF"
+                    Foreground="White"
+                    VerticalAlignment="Stretch"
+                    VerticalContentAlignment="Center"/>
         </Grid>
     </Grid>
 </Window>
