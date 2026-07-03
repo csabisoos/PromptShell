@@ -73,9 +73,14 @@
                                             <Border Background="#0F0F11" BorderBrush="#27272C" BorderThickness="1" CornerRadius="6" Padding="10,8">
                                                 <TextBlock Text="{Binding PendingCommand}" Foreground="#A9A9B3" FontSize="11" FontFamily="Cascadia Code, Courier New" TextWrapping="Wrap"/>
                                             </Border>
-                                            <StackPanel Spacing="6" IsVisible="{Binding IsActionPending}">
-                                                <Button Content="✓ Approve" Foreground="#FFFFFF" Background="#34C759" Padding="12,8" CornerRadius="6" FontSize="11" HorizontalAlignment="Stretch"/>
-                                                <Button Content="✕ Reject" Foreground="#A9A9B3" Background="Transparent" BorderBrush="#8E8E93" BorderThickness="1" Padding="12,8" CornerRadius="6" FontSize="11" HorizontalAlignment="Stretch"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding IsActionPending}">
+                                                <Button Content="Approve &amp; Run" 
+                                                        Command="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).ApproveCommandCommand}" 
+                                                        Background="#34C759" Foreground="Black" FontWeight="Bold" Padding="15,6" CornerRadius="4"/>
+    
+                                                <Button Content="Reject" 
+                                                        Command="{Binding $parent[ListBox].((vm:MainWindowViewModel)DataContext).RejectCommandCommand}" 
+                                                        Background="#FF3B30" Foreground="White" Padding="15,6" CornerRadius="4"/>
                                             </StackPanel>
                                             <TextBlock IsVisible="{Binding !IsActionPending}" Text="✓ Completed" Foreground="#8E8E93" FontSize="10" TextAlignment="Center"/>
                                         </StackPanel>
