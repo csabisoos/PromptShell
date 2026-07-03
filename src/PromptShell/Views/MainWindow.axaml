@@ -57,7 +57,7 @@
         <Grid Grid.Row="3" ColumnDefinitions="*, Auto" IsEnabled="{Binding !IsPendingApproval}">
             <TextBox Grid.Column="0" 
                      Text="{Binding InputCommand, Mode=TwoWay}" 
-                     Watermark="Ask AI to do something in this directory (e.g., 'show size of docs folder')..."
+                     PlaceholderText="Ask AI to do something in this directory (e.g., 'show size of docs folder')..."
                      Background="#2B2B2B" Foreground="White" BorderBrush="#3C3F41" VerticalContentAlignment="Center">
                 <TextBox.KeyBindings>
                     <KeyBinding Gesture="Enter" Command="{Binding ExecuteTerminalCommandCommand}"/>
